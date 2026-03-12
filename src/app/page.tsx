@@ -60,6 +60,35 @@ const sampleSchedule: Schedule[] = [
 
 const categories = ['All', 'Live', 'Sermons', 'Music', 'Movies', 'Shows', 'Kids'];
 
+// Helper function to extract YouTube video ID from any YouTube URL format
+function getYouTubeVideoId(url: string): string | null {
+  if (!url) return null;
+  // Handle various YouTube URL formats:
+  // - https://www.youtube.com/watch?v=VIDEO_ID
+  // - https://m.youtube.com/watch?v=VIDEO_ID
+  // - https://youtu.be/VIDEO_ID
+  // - https://youtube.com/embed/VIDEO_ID
+  // - https://youtube.com/watch?v=VIDEO_ID&feature=share
+  const patterns = [
+    /(?:youtube\.com\/watch\?(?:.*&)?v=)([a-zA-Z0-9_-]+)/,
+    /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/,
+    /(?:youtu\.be\/)([a-zA-Z0-9_-]+)/,
+    /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]+)/
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+// Helper function to get proper YouTube embed URL
+function getYouTubeEmbedUrl(url: string): string | null {
+  const videoId = getYouTubeVideoId(url);
+  if (!videoId) return null;
+  return `https://www.youtube.com/embed/${videoId}`;
+}
+
 export default function HomePage() {
   const [videos, setVideos] = useState<Video[]>(sampleVideos);
   const [slides, setSlides] = useState<Slide[]>(sampleSlides);
@@ -457,9 +486,9 @@ function LiveScreen({ onBack, videos }: { onBack: () => void; videos: Video[] })
       </div>
 
       <div className="w-full h-full flex items-center justify-center">
-        {liveVideo?.youtube_url ? (
+        {liveVideo?.youtube_url && getYouTubeEmbedUrl(liveVideo.youtube_url) ? (
           <iframe 
-            src={`${liveVideo.youtube_url.replace('watch?v=', 'embed/')}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1`}
+            src={`${getYouTubeEmbedUrl(liveVideo.youtube_url)}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1`}
             className="w-full h-full" 
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
             allowFullScreen 
@@ -508,9 +537,9 @@ function VideoPlayerScreen({ video, onBack, autoplay }: { video: Video; onBack: 
 
       <div className="w-full h-full flex items-center justify-center">
         <div className="relative w-full h-full max-w-5xl mx-auto">
-          {video.youtube_url ? (
+          {video.youtube_url && getYouTubeEmbedUrl(video.youtube_url) ? (
             <iframe
-              src={`${video.youtube_url.replace('watch?v=', 'embed/')}?autoplay=${autoplay ? 1 : 0}`}
+              src={`${getYouTubeEmbedUrl(video.youtube_url)}?autoplay=${autoplay ? 1 : 0}`}
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
