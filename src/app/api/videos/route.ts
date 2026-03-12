@@ -89,20 +89,34 @@ export async function GET() {
   }
 }
 
+// Helper to extract YouTube thumbnail from URL
+function getYouTubeThumbnail(url: string): string | null {
+  if (!url) return null
+  const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/)
+  return match ? `https://img.youtube.com/vi/${match[1]}/maxresdefault.jpg` : null
+}
+
 // POST - Add new video
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    // Generate ID if not provided
+    // Generate ID if not provided (must be UUID format for Supabase)
     const id = body.id || crypto.randomUUID()
+    
+    // Auto-generate thumbnail from YouTube URL if not provided
+    let thumbnail_url = body.thumbnail_url || body.thumbnail || null
+    if (!thumbnail_url && body.youtube_url) {
+      thumbnail_url = getYouTubeThumbnail(body.youtube_url)
+    }
+    
     const video = {
       id,
       title: body.title || 'Untitled',
       description: body.description || null,
       video_url: body.video_url || null,
       youtube_url: body.youtube_url || null,
-      thumbnail_url: body.thumbnail_url || body.thumbnail || null,
+      thumbnail_url,
       category: body.category || 'General',
       featured: body.featured || body.is_live || false,
       duration: body.duration || null
