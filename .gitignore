@@ -77,3 +77,4 @@ prompt
 
 # Prisma generated (will regenerate on install)
 src/generated/
+.env.local
