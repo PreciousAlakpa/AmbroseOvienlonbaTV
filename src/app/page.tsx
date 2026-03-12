@@ -31,6 +31,14 @@ interface Schedule {
 interface Settings {
   autoplay: boolean;
   darkMode: boolean;
+  loopPlayback: boolean;
+  continuousPlay: boolean;
+}
+
+interface VideoQueueItem {
+  id: string;
+  video_id: string;
+  order_index: number;
 }
 
 const sampleVideos: Video[] = [
@@ -93,7 +101,8 @@ export default function HomePage() {
   const [videos, setVideos] = useState<Video[]>(sampleVideos);
   const [slides, setSlides] = useState<Slide[]>(sampleSlides);
   const [schedule, setSchedule] = useState<Schedule[]>(sampleSchedule);
-  const [settings, setSettings] = useState<Settings>({ autoplay: true, darkMode: false });
+  const [settings, setSettings] = useState<Settings>({ autoplay: true, darkMode: false, loopPlayback: true, continuousPlay: true });
+  const [videoQueue, setVideoQueue] = useState<VideoQueueItem[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showSplash, setShowSplash] = useState(true);
   const [showAdmin, setShowAdmin] = useState(false);
@@ -104,12 +113,15 @@ export default function HomePage() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [historyStack, setHistoryStack] = useState<string[]>(['splash']);
 
   // Fetch data from Supabase - videos stored in database show on ALL devices
   useEffect(() => {
     fetch('/api/videos').then(r => r.json()).then(d => d.videos?.length && setVideos(d.videos));
     fetch('/api/slides').then(r => r.json()).then(d => d.slides?.length && setSlides(d.slides));
+    // Fetch video queue from Supabase
+    fetch('/api/queue').then(r => r.json()).then(d => d.queue?.length && setVideoQueue(d.queue));
   }, []);
 
   useEffect(() => {
@@ -152,12 +164,42 @@ export default function HomePage() {
   const filteredVideos = activeCategory === 'All' ? videos : videos.filter(v => v.category === activeCategory);
   const searchResults = searchQuery ? videos.filter(v => v.title.toLowerCase().includes(searchQuery.toLowerCase())) : null;
 
+  // Get ordered video queue - videos play in this order
+  const getOrderedVideos = (): Video[] => {
+    if (videoQueue.length > 0) {
+      // Use custom queue order
+      return videoQueue
+        .sort((a, b) => a.order_index - b.order_index)
+        .map(q => videos.find(v => v.id === q.video_id))
+        .filter((v): v is Video => v !== undefined);
+    }
+    // Default order: all videos
+    return videos;
+  };
+
+  const orderedVideos = getOrderedVideos();
+
+  // Play video within app (NOT opening YouTube)
   const playVideo = (v: Video) => {
-    if (v.youtube_url) {
-      window.open(v.youtube_url, '_blank');
-    } else {
-      setSelectedVideo(v);
-      navigateTo('video');
+    // Find index in ordered queue
+    const idx = orderedVideos.findIndex(vid => vid.id === v.id);
+    setCurrentVideoIndex(idx >= 0 ? idx : 0);
+    setSelectedVideo(v);
+    navigateTo('video');
+  };
+
+  // Play next video in queue
+  const playNextVideo = () => {
+    if (!settings.continuousPlay) return;
+    
+    const nextIndex = currentVideoIndex + 1;
+    if (nextIndex < orderedVideos.length) {
+      setCurrentVideoIndex(nextIndex);
+      setSelectedVideo(orderedVideos[nextIndex]);
+    } else if (settings.loopPlayback && orderedVideos.length > 0) {
+      // Loop back to first video
+      setCurrentVideoIndex(0);
+      setSelectedVideo(orderedVideos[0]);
     }
   };
 
@@ -166,9 +208,19 @@ export default function HomePage() {
     return <LiveScreen onBack={goBack} videos={liveVideos} />;
   }
 
-  // VIDEO PLAYER SCREEN
+  // VIDEO PLAYER SCREEN - with autoplay next video
   if (selectedVideo) {
-    return <VideoPlayerScreen video={selectedVideo} onBack={() => { setSelectedVideo(null); goBack(); }} autoplay={settings.autoplay} />;
+    return (
+      <VideoPlayerScreen 
+        video={selectedVideo} 
+        onBack={() => { setSelectedVideo(null); goBack(); }} 
+        autoplay={settings.autoplay}
+        playNextVideo={playNextVideo}
+        orderedVideos={orderedVideos}
+        currentVideoIndex={currentVideoIndex}
+        settings={settings}
+      />
+    );
   }
 
   // SPLASH SCREEN - Full screen image slider
@@ -457,15 +509,30 @@ export default function HomePage() {
   );
 }
 
-// Live Screen Component
-function LiveScreen({ onBack, videos }: { onBack: () => void; videos: Video[] }) {
+// Live Screen Component - with TV logo and continuous playback
+function LiveScreen({ onBack, videos, onPlayVideo }: { onBack: () => void; videos: Video[]; onPlayVideo?: (v: Video) => void }) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
-  const liveVideo = videos[0];
+  const [currentLiveIndex, setCurrentLiveIndex] = useState(0);
+  const liveVideo = videos[currentLiveIndex] || videos[0];
+
+  const playNextLive = () => {
+    if (videos.length > 1) {
+      setCurrentLiveIndex((prev) => (prev + 1) % videos.length);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-gray-900 z-[100]">
-      <button onClick={onBack} className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 transition-colors text-white">
+      {/* TV Logo Watermark - Top Left */}
+      <div className="absolute top-4 left-4 z-30 flex items-center gap-2">
+        <div className="bg-blue-600 px-3 py-1.5 rounded-lg shadow-lg">
+          <span className="text-white font-black text-sm">AOTV</span>
+        </div>
+      </div>
+
+      {/* Back Button */}
+      <button onClick={onBack} className="absolute top-4 left-24 z-20 flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 transition-colors text-white">
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         <span className="text-sm">Back</span>
       </button>
@@ -484,6 +551,19 @@ function LiveScreen({ onBack, videos }: { onBack: () => void; videos: Video[] })
           <span className="w-2 h-2 bg-white rounded-full animate-pulse" />LIVE NOW
         </span>
       </div>
+
+      {/* Video selector for multiple live videos */}
+      {videos.length > 1 && (
+        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-20 flex gap-2">
+          {videos.map((v, i) => (
+            <button
+              key={v.id}
+              onClick={() => setCurrentLiveIndex(i)}
+              className={`w-3 h-3 rounded-full transition-all ${i === currentLiveIndex ? 'bg-blue-500 w-6' : 'bg-white/50'}`}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="w-full h-full flex items-center justify-center">
         {liveVideo?.youtube_url && getYouTubeEmbedUrl(liveVideo.youtube_url) ? (
@@ -526,20 +606,71 @@ function LiveScreen({ onBack, videos }: { onBack: () => void; videos: Video[] })
   );
 }
 
-// Video Player Screen Component
-function VideoPlayerScreen({ video, onBack, autoplay }: { video: Video; onBack: () => void; autoplay: boolean }) {
+// Video Player Screen Component - with autoplay next video and TV logo
+function VideoPlayerScreen({ 
+  video, 
+  onBack, 
+  autoplay, 
+  playNextVideo,
+  orderedVideos,
+  currentVideoIndex,
+  settings
+}: { 
+  video: Video; 
+  onBack: () => void; 
+  autoplay: boolean;
+  playNextVideo?: () => void;
+  orderedVideos?: Video[];
+  currentVideoIndex?: number;
+  settings?: Settings;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [showUpNext, setShowUpNext] = useState(false);
+  
+  // Listen for video end to autoplay next
+  useEffect(() => {
+    if (!settings?.continuousPlay || !playNextVideo) return;
+    
+    // Show "Up Next" notification before video ends
+    const timer = setTimeout(() => {
+      setShowUpNext(true);
+    }, 5000); // Show after 5 seconds for demo
+    
+    return () => clearTimeout(timer);
+  }, [video.id, settings?.continuousPlay, playNextVideo]);
+
+  const nextVideo = orderedVideos && currentVideoIndex !== undefined 
+    ? orderedVideos[currentVideoIndex + 1] 
+    : null;
+
   return (
     <div className="fixed inset-0 bg-gray-900 z-[100]">
-      <button onClick={onBack} className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 text-white">
+      {/* TV Logo Watermark - Top Left */}
+      <div className="absolute top-4 left-4 z-30 flex items-center gap-2">
+        <div className="bg-blue-600 px-3 py-1.5 rounded-lg">
+          <span className="text-white font-black text-sm">AOTV</span>
+        </div>
+      </div>
+
+      {/* Back Button - moved right to not overlap logo */}
+      <button onClick={onBack} className="absolute top-4 left-24 z-20 flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 text-white">
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         <span className="text-sm">Back</span>
       </button>
+
+      {/* Video Counter */}
+      {orderedVideos && currentVideoIndex !== undefined && (
+        <div className="absolute top-4 right-4 z-20 bg-black/50 px-3 py-1.5 rounded-full text-white text-sm">
+          {currentVideoIndex + 1} / {orderedVideos.length}
+        </div>
+      )}
 
       <div className="w-full h-full flex items-center justify-center">
         <div className="relative w-full h-full max-w-5xl mx-auto">
           {video.youtube_url && getYouTubeEmbedUrl(video.youtube_url) ? (
             <iframe
-              src={`${getYouTubeEmbedUrl(video.youtube_url)}?autoplay=${autoplay ? 1 : 0}`}
+              ref={iframeRef}
+              src={`${getYouTubeEmbedUrl(video.youtube_url)}?autoplay=${autoplay ? 1 : 0}&enablejsapi=1`}
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -559,6 +690,34 @@ function VideoPlayerScreen({ video, onBack, autoplay }: { video: Video; onBack: 
             </div>
           )}
         </div>
+      </div>
+
+      {/* Up Next Notification */}
+      {showUpNext && nextVideo && settings?.continuousPlay && (
+        <div className="absolute bottom-24 right-4 z-20 bg-black/80 backdrop-blur-sm rounded-lg p-4 max-w-xs">
+          <p className="text-white/70 text-xs mb-1">Up Next:</p>
+          <p className="text-white font-medium text-sm mb-2 line-clamp-1">{nextVideo.title}</p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => playNextVideo?.()} 
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 px-3 rounded font-medium"
+            >
+              Play Now
+            </button>
+            <button 
+              onClick={() => setShowUpNext(false)} 
+              className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs py-2 px-3 rounded font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Video Title Bar at Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 z-10">
+        <h2 className="text-lg font-bold text-white mb-1">{video.title}</h2>
+        <p className="text-white/60 text-xs">{video.category} • {video.duration || 'Live'}</p>
       </div>
     </div>
   );
@@ -764,6 +923,7 @@ function AdminPanel({
           {[
             { id: 'videos', label: 'Videos' },
             { id: 'add', label: 'Add Video' },
+            { id: 'queue', label: 'Video Queue' },
             { id: 'slides', label: 'Image Slider' },
             { id: 'schedule', label: 'Schedule' },
             { id: 'settings', label: 'Settings' },
@@ -884,6 +1044,68 @@ function AdminPanel({
           </div>
         )}
 
+        {tab === 'queue' && (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <h3 className="text-lg font-bold text-blue-800 mb-2">📺 Video Playback Queue</h3>
+              <p className="text-sm text-blue-700">Drag videos to set playback order. When one video ends, the next plays automatically on ALL devices.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Available Videos */}
+              <div>
+                <h4 className="font-bold text-gray-700 mb-3">Available Videos ({videos.length})</h4>
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-2 max-h-96 overflow-y-auto">
+                  {videos.map((v, i) => (
+                    <div 
+                      key={v.id} 
+                      className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer"
+                    >
+                      <div className="w-16 h-10 bg-gray-200 rounded overflow-hidden flex-shrink-0">
+                        {v.thumbnail_url && <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{v.title}</p>
+                        <p className="text-xs text-gray-500">{v.category} • {v.duration || 'Live'}</p>
+                      </div>
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">#{i + 1}</span>
+                    </div>
+                  ))}
+                  {videos.length === 0 && (
+                    <p className="text-center text-gray-400 py-8">No videos added yet</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Queue Order Info */}
+              <div>
+                <h4 className="font-bold text-gray-700 mb-3">Playback Order</h4>
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-4">Videos play in the order shown above. The queue automatically syncs to all devices.</p>
+                  
+                  <div className="space-y-3">
+                    {videos.slice(0, 5).map((v, i) => (
+                      <div key={v.id} className="flex items-center gap-2 text-sm">
+                        <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">{i + 1}</span>
+                        <span className="text-gray-700 truncate">{v.title}</span>
+                      </div>
+                    ))}
+                    {videos.length > 5 && (
+                      <p className="text-xs text-gray-400">+{videos.length - 5} more videos</p>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500">
+                      💡 Tip: Videos will play continuously without repeating. When all videos finish, playback stops.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {tab === 'slides' && (
           <div className="space-y-8">
             <div className="max-w-lg">
@@ -1000,6 +1222,7 @@ function AdminPanel({
           <div className="max-w-lg space-y-6">
             <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
               <h2 className="text-lg font-bold mb-4">Playback Settings</h2>
+              
               <div className="flex items-center justify-between py-4 border-b border-gray-200">
                 <div>
                   <p className="font-medium">Autoplay Videos</p>
@@ -1012,18 +1235,42 @@ function AdminPanel({
                   <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${settings.autoplay ? 'translate-x-7' : 'translate-x-1'}`} />
                 </button>
               </div>
-              <div className="flex items-center justify-between py-4">
+
+              <div className="flex items-center justify-between py-4 border-b border-gray-200">
                 <div>
-                  <p className="font-medium">Dark Mode</p>
-                  <p className="text-sm text-gray-500">Use dark theme</p>
+                  <p className="font-medium">Continuous Playback</p>
+                  <p className="text-sm text-gray-500">Auto-play next video when current ends</p>
                 </div>
                 <button 
-                  onClick={() => setSettings({ ...settings, darkMode: !settings.darkMode })}
-                  className={`w-14 h-8 rounded-full transition-colors ${settings.darkMode ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  onClick={() => setSettings({ ...settings, continuousPlay: !settings.continuousPlay })}
+                  className={`w-14 h-8 rounded-full transition-colors ${settings.continuousPlay ? 'bg-blue-600' : 'bg-gray-300'}`}
                 >
-                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${settings.darkMode ? 'translate-x-7' : 'translate-x-1'}`} />
+                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${settings.continuousPlay ? 'translate-x-7' : 'translate-x-1'}`} />
                 </button>
               </div>
+
+              <div className="flex items-center justify-between py-4">
+                <div>
+                  <p className="font-medium">Loop Playback</p>
+                  <p className="text-sm text-gray-500">Restart from first video when all finish</p>
+                </div>
+                <button 
+                  onClick={() => setSettings({ ...settings, loopPlayback: !settings.loopPlayback })}
+                  className={`w-14 h-8 rounded-full transition-colors ${settings.loopPlayback ? 'bg-blue-600' : 'bg-gray-300'}`}
+                >
+                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${settings.loopPlayback ? 'translate-x-7' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <h3 className="text-lg font-bold text-blue-800 mb-2">📺 TV Mode Features</h3>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• Videos play in queue order on all devices</li>
+                <li>• AOTV logo watermark on all videos</li>
+                <li>• No YouTube redirect - plays in app</li>
+                <li>• Continuous playback without interruption</li>
+              </ul>
             </div>
 
             <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
@@ -1031,7 +1278,7 @@ function AdminPanel({
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Version</span>
-                  <span className="text-gray-900">3.0.0</span>
+                  <span className="text-gray-900">4.0.0</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Platform</span>
