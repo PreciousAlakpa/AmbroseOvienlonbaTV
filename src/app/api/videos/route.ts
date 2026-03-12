@@ -58,7 +58,7 @@ export async function GET() {
 
   try {
     const { data, error } = await supabaseRequest('videos', {
-      query: '?select=*&order=created_at.desc'
+      query: '?select=*&order=order_index.asc,created_at.desc'
     })
 
     if (error || !data) {
@@ -76,7 +76,8 @@ export async function GET() {
       thumbnail_url: v.thumbnail_url as string,
       category: (v.category as string) || 'General',
       featured: (v.featured as boolean) || false,
-      duration: v.duration as string
+      duration: v.duration as string,
+      order_index: v.order_index as number
     }))
 
     videosStore = videos
@@ -119,7 +120,8 @@ export async function POST(request: NextRequest) {
       thumbnail_url,
       category: body.category || 'General',
       featured: body.featured || body.is_live || false,
-      duration: body.duration || null
+      duration: body.duration || null,
+      order_index: body.order_index || 0
     }
 
     // Add to local store
@@ -138,7 +140,8 @@ export async function POST(request: NextRequest) {
           thumbnail_url: video.thumbnail_url,
           category: video.category,
           featured: video.featured,
-          duration: video.duration
+          duration: video.duration,
+          order_index: video.order_index
         }
       })
 
@@ -180,6 +183,7 @@ export async function PUT(request: NextRequest) {
           category: video.category,
           featured: video.featured,
           duration: video.duration,
+          order_index: video.order_index,
           updated_at: new Date().toISOString()
         }
       })

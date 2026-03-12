@@ -12,6 +12,7 @@ interface Video {
   category: string;
   featured: boolean;
   duration?: string;
+  order_index?: number;
 }
 
 interface Slide {
@@ -791,6 +792,239 @@ function VideoCard({ video, onClick }: { video: Video; onClick: () => void }) {
   );
 }
 
+// Draggable Video Queue Component with proper drag-and-drop
+function DraggableVideoQueue({ videos, setVideos }: { videos: Video[]; setVideos: (v: Video[]) => void }) {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+    // Add visual feedback
+    const target = e.target as HTMLElement;
+    setTimeout(() => target.style.opacity = '0.5', 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    const target = e.target as HTMLElement;
+    target.style.opacity = '1';
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    // Reorder videos
+    const newVideos = [...videos];
+    const [draggedVideo] = newVideos.splice(draggedIndex, 1);
+    newVideos.splice(dropIndex, 0, draggedVideo);
+    
+    setVideos(newVideos);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+
+    // Save new order to Supabase
+    setSaving(true);
+    try {
+      // Update each video's order in the database
+      for (let i = 0; i < newVideos.length; i++) {
+        await fetch('/api/videos', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            id: newVideos[i].id, 
+            order_index: i 
+          })
+        });
+      }
+    } catch (err) {
+      console.error('Error saving queue order:', err);
+    }
+    setSaving(false);
+  };
+
+  const moveUp = async (index: number) => {
+    if (index === 0) return;
+    const newVideos = [...videos];
+    [newVideos[index - 1], newVideos[index]] = [newVideos[index], newVideos[index - 1]];
+    setVideos(newVideos);
+    
+    // Save to database
+    setSaving(true);
+    for (let i = 0; i < newVideos.length; i++) {
+      await fetch('/api/videos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: newVideos[i].id, order_index: i })
+      });
+    }
+    setSaving(false);
+  };
+
+  const moveDown = async (index: number) => {
+    if (index === videos.length - 1) return;
+    const newVideos = [...videos];
+    [newVideos[index], newVideos[index + 1]] = [newVideos[index + 1], newVideos[index]];
+    setVideos(newVideos);
+    
+    // Save to database
+    setSaving(true);
+    for (let i = 0; i < newVideos.length; i++) {
+      await fetch('/api/videos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: newVideos[i].id, order_index: i })
+      });
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-blue-800 mb-1">📺 Video Playback Queue</h3>
+            <p className="text-sm text-blue-700">Drag videos to reorder. Changes sync to ALL devices automatically.</p>
+          </div>
+          {saving && (
+            <span className="text-sm text-blue-600 flex items-center gap-2">
+              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+              Saving...
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Draggable Queue List */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <h4 className="font-bold text-gray-700">Playback Order ({videos.length} videos)</h4>
+        </div>
+        
+        <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
+          {videos.length === 0 ? (
+            <div className="p-8 text-center text-gray-400">
+              <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              <p>No videos in queue</p>
+              <p className="text-sm mt-1">Add videos from the "Add Video" tab</p>
+            </div>
+          ) : (
+            videos.map((video, index) => (
+              <div
+                key={video.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, index)}
+                className={`
+                  flex items-center gap-4 p-4 cursor-move transition-all duration-200
+                  ${draggedIndex === index ? 'opacity-50 bg-blue-50' : 'bg-white hover:bg-gray-50'}
+                  ${dragOverIndex === index && draggedIndex !== index ? 'border-t-2 border-blue-500' : ''}
+                `}
+              >
+                {/* Position Number */}
+                <div className="flex flex-col items-center gap-1">
+                  <span className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                    {index + 1}
+                  </span>
+                  <span className="text-xs text-gray-400">#{index + 1}</span>
+                </div>
+
+                {/* Drag Handle */}
+                <div className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                  </svg>
+                </div>
+
+                {/* Thumbnail */}
+                <div className="w-24 h-14 bg-gray-200 rounded overflow-hidden flex-shrink-0">
+                  {video.thumbnail_url ? (
+                    <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    </div>
+                  )}
+                </div>
+
+                {/* Video Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{video.title}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="bg-gray-100 px-2 py-0.5 rounded">{video.category}</span>
+                    <span>•</span>
+                    <span>{video.duration || 'Live'}</span>
+                    {video.featured && (
+                      <>
+                        <span>•</span>
+                        <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded font-medium">LIVE</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Move Buttons */}
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => moveUp(index)}
+                    disabled={index === 0}
+                    className={`p-1.5 rounded transition-colors ${index === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
+                    title="Move up"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                  </button>
+                  <button
+                    onClick={() => moveDown(index)}
+                    disabled={index === videos.length - 1}
+                    className={`p-1.5 rounded transition-colors ${index === videos.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
+                    title="Move down"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Help Text */}
+      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+        <h4 className="font-medium text-gray-700 mb-2">How to reorder videos:</h4>
+        <ul className="text-sm text-gray-600 space-y-1">
+          <li>• <strong>Drag & Drop:</strong> Click and drag any video to a new position</li>
+          <li>• <strong>Arrow Buttons:</strong> Use ↑↓ buttons to move videos one position</li>
+          <li>• Changes are saved automatically and sync to all devices</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 // Admin Panel Component with all features
 function AdminPanel({ 
   onClose, 
@@ -1045,65 +1279,7 @@ function AdminPanel({
         )}
 
         {tab === 'queue' && (
-          <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <h3 className="text-lg font-bold text-blue-800 mb-2">📺 Video Playback Queue</h3>
-              <p className="text-sm text-blue-700">Drag videos to set playback order. When one video ends, the next plays automatically on ALL devices.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Available Videos */}
-              <div>
-                <h4 className="font-bold text-gray-700 mb-3">Available Videos ({videos.length})</h4>
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-2 max-h-96 overflow-y-auto">
-                  {videos.map((v, i) => (
-                    <div 
-                      key={v.id} 
-                      className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer"
-                    >
-                      <div className="w-16 h-10 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-                        {v.thumbnail_url && <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{v.title}</p>
-                        <p className="text-xs text-gray-500">{v.category} • {v.duration || 'Live'}</p>
-                      </div>
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">#{i + 1}</span>
-                    </div>
-                  ))}
-                  {videos.length === 0 && (
-                    <p className="text-center text-gray-400 py-8">No videos added yet</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Queue Order Info */}
-              <div>
-                <h4 className="font-bold text-gray-700 mb-3">Playback Order</h4>
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <p className="text-sm text-gray-600 mb-4">Videos play in the order shown above. The queue automatically syncs to all devices.</p>
-                  
-                  <div className="space-y-3">
-                    {videos.slice(0, 5).map((v, i) => (
-                      <div key={v.id} className="flex items-center gap-2 text-sm">
-                        <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">{i + 1}</span>
-                        <span className="text-gray-700 truncate">{v.title}</span>
-                      </div>
-                    ))}
-                    {videos.length > 5 && (
-                      <p className="text-xs text-gray-400">+{videos.length - 5} more videos</p>
-                    )}
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-xs text-gray-500">
-                      💡 Tip: Videos will play continuously without repeating. When all videos finish, playback stops.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <DraggableVideoQueue videos={videos} setVideos={setVideos} />
         )}
 
         {tab === 'slides' && (
