@@ -75,7 +75,7 @@ export default function TVMode() {
   };
 
   return (
-    <div ref={containerRef} className="fixed inset-0 bg-black z-50" onMouseMove={() => setShowControls(true)}>
+    <div ref={containerRef} className="fixed inset-0 bg-gray-900 z-50" onMouseMove={() => setShowControls(true)}>
       <div className="w-full h-full flex items-center justify-center">
         {currentVideo?.youtube_url ? (
           <iframe 
@@ -111,7 +111,6 @@ export default function TVMode() {
             <span className="text-sm">Back to Home</span>
           </a>
           <div className="flex items-center gap-4">
-            {/* UNMUTE BUTTON */}
             {showUnmute && (
               <button 
                 onClick={handleUnmute}

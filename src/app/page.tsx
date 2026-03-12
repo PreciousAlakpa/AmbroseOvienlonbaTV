@@ -28,27 +28,45 @@ interface Schedule {
   description?: string;
 }
 
-interface TVSettings {
+interface Settings {
   autoplay: boolean;
-  singleMode: boolean;
-  loopPlayback: boolean;
-  showSchedule: boolean;
+  darkMode: boolean;
 }
+
+const sampleVideos: Video[] = [
+  { id: '1', title: 'Sunday Morning Worship Service', category: 'Live', featured: true, thumbnail_url: 'https://images.unsplash.com/photo-1438232992991-995b7058bbb3?w=800', duration: '2:45:00', description: 'Join us for our Sunday morning worship service' } as Video,
+  { id: '2', title: 'Evening Prayer Session', category: 'Sermons', featured: false, thumbnail_url: 'https://images.unsplash.com/photo-1507692049790-de58290a4334?w=800', duration: '1:30:00', description: 'A powerful evening prayer session' } as Video,
+  { id: '3', title: 'Gospel Music Special', category: 'Music', featured: false, thumbnail_url: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800', duration: '45:00', description: 'Beautiful gospel music collection' } as Video,
+  { id: '4', title: 'Faith Documentary: Journey of Belief', category: 'Movies', featured: false, thumbnail_url: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800', duration: '1:52:00', description: 'A compelling documentary about faith' } as Video,
+  { id: '5', title: 'Bible Study: The Gospel of John', category: 'Sermons', featured: false, thumbnail_url: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=800', duration: '1:15:00', description: 'Deep dive into the Gospel of John' } as Video,
+  { id: '6', title: 'Youth Conference 2024', category: 'Sermons', featured: false, thumbnail_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800', duration: '3:00:00', description: 'Annual youth conference highlights' } as Video,
+  { id: '7', title: 'Praise & Worship Medley', category: 'Music', featured: true, thumbnail_url: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=800', duration: '32:00', description: 'Uplifting praise and worship songs' } as Video,
+  { id: '8', title: 'Miracles of Jesus', category: 'Movies', featured: false, thumbnail_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800', duration: '2:10:00', description: 'A cinematic portrayal of miracles' } as Video,
+];
+
+const sampleSlides: Slide[] = [
+  { id: '1', title: 'Welcome to AmbroseOvienlonbaTV', image_url: 'https://images.unsplash.com/photo-1507692049790-de58290a4334?w=1920' } as Slide,
+  { id: '2', title: 'Live Sunday Service', image_url: 'https://images.unsplash.com/photo-1438232992991-995b7058bbb3?w=1920' } as Slide,
+  { id: '3', title: 'Gospel Music Night', image_url: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1920' } as Slide,
+];
+
+const sampleSchedule: Schedule[] = [
+  { id: '1', title: 'Morning Devotion', day: 'Monday', time: '06:00', description: 'Start your day with prayer' },
+  { id: '2', title: 'Bible Study', day: 'Tuesday', time: '19:00', description: 'Weekly bible study session' },
+  { id: '3', title: 'Midweek Service', day: 'Wednesday', time: '18:00', description: 'Midweek praise and worship' },
+  { id: '4', title: 'Youth Fellowship', day: 'Friday', time: '17:00', description: 'Youth gathering and worship' },
+  { id: '5', title: 'Sunday Service', day: 'Sunday', time: '09:00', description: 'Main Sunday worship service' },
+];
 
 const categories = ['All', 'Live', 'Sermons', 'Music', 'Movies', 'Shows', 'Kids'];
 
 export default function HomePage() {
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [slides, setSlides] = useState<Slide[]>([]);
-  const [schedule, setSchedule] = useState<Schedule[]>([]);
-  const [tvSettings, setTVSettings] = useState<TVSettings>({ 
-    autoplay: true, 
-    singleMode: false, 
-    loopPlayback: true,
-    showSchedule: true 
-  });
+  const [videos, setVideos] = useState<Video[]>(sampleVideos);
+  const [slides, setSlides] = useState<Slide[]>(sampleSlides);
+  const [schedule, setSchedule] = useState<Schedule[]>(sampleSchedule);
+  const [settings, setSettings] = useState<Settings>({ autoplay: true, darkMode: false });
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [showMainApp, setShowMainApp] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showSideMenu, setShowSideMenu] = useState(false);
   const [showLiveScreen, setShowLiveScreen] = useState(false);
@@ -57,27 +75,46 @@ export default function HomePage() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [historyStack, setHistoryStack] = useState<string[]>(['splash']);
 
-  // Fetch data from Supabase
+  // Fetch data from Supabase - videos stored in database show on ALL devices
   useEffect(() => {
-    fetch('/api/videos')
-      .then(r => r.json())
-      .then(d => {
-        if (d.videos && d.videos.length > 0) setVideos(d.videos);
-      });
-    fetch('/api/slides')
-      .then(r => r.json())
-      .then(d => {
-        if (d.slides && d.slides.length > 0) setSlides(d.slides);
-      });
+    fetch('/api/videos').then(r => r.json()).then(d => d.videos?.length && setVideos(d.videos));
+    fetch('/api/slides').then(r => r.json()).then(d => d.slides?.length && setSlides(d.slides));
   }, []);
 
-  // Auto-slide for hero
   useEffect(() => {
-    if (slides.length <= 1 || showMainApp) return;
+    if (slides.length <= 1 || !showSplash) return;
     const i = setInterval(() => setCurrentSlide(p => (p + 1) % slides.length), 5000);
     return () => clearInterval(i);
-  }, [slides.length, showMainApp]);
+  }, [slides.length, showSplash]);
+
+  const navigateTo = (screen: string) => {
+    setHistoryStack(prev => [...prev, screen]);
+    if (screen === 'splash') setShowSplash(true);
+    else if (screen === 'live') setShowLiveScreen(true);
+    else if (screen === 'admin') setShowAdmin(true);
+    else setShowSplash(false);
+  };
+
+  const goBack = () => {
+    if (historyStack.length > 1) {
+      const newHistory = [...historyStack.slice(0, -1)];
+      setHistoryStack(newHistory);
+      const prevScreen = newHistory[newHistory.length - 1];
+      if (prevScreen === 'splash') {
+        setShowSplash(true);
+        setShowLiveScreen(false);
+        setShowAdmin(false);
+        setSelectedVideo(null);
+      } else if (prevScreen === 'home') {
+        setShowSplash(false);
+        setShowLiveScreen(false);
+        setShowAdmin(false);
+        setSelectedVideo(null);
+      }
+    }
+  };
 
   const liveVideos = videos.filter(v => v.featured || v.category === 'Live');
   const sermonsVideos = videos.filter(v => v.category === 'Sermons');
@@ -87,64 +124,61 @@ export default function HomePage() {
   const searchResults = searchQuery ? videos.filter(v => v.title.toLowerCase().includes(searchQuery.toLowerCase())) : null;
 
   const playVideo = (v: Video) => {
-    setSelectedVideo(v);
+    if (v.youtube_url) {
+      window.open(v.youtube_url, '_blank');
+    } else {
+      setSelectedVideo(v);
+      navigateTo('video');
+    }
   };
 
   // LIVE VIDEO SCREEN
   if (showLiveScreen) {
-    return <LiveScreen onBack={() => setShowLiveScreen(false)} videos={liveVideos} />;
+    return <LiveScreen onBack={goBack} videos={liveVideos} />;
   }
 
   // VIDEO PLAYER SCREEN
   if (selectedVideo) {
-    return <VideoPlayerScreen video={selectedVideo} onBack={() => setSelectedVideo(null)} autoplay={tvSettings.autoplay} />;
+    return <VideoPlayerScreen video={selectedVideo} onBack={() => { setSelectedVideo(null); goBack(); }} autoplay={settings.autoplay} />;
   }
 
-  // FIRST SCREEN - FULL SCREEN IMAGE SLIDER
-  if (!showMainApp) {
+  // SPLASH SCREEN - Full screen image slider
+  if (showSplash) {
     return (
       <div className="fixed inset-0 bg-white">
-        {/* Full Screen Slider */}
         {slides.map((s, i) => (
           <div key={s.id} className={`absolute inset-0 transition-opacity duration-1000 ${i === currentSlide ? 'opacity-100' : 'opacity-0'}`}>
             <img src={s.image_url} alt={s.title} className="w-full h-full object-cover" />
           </div>
         ))}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
         
-        {/* Top Navigation */}
         <nav className="absolute top-0 left-0 right-0 z-20 px-6 md:px-12 py-6 flex justify-between items-center">
           <h1 className="text-xl md:text-2xl font-black text-white">AmbroseOvienlonba<span className="text-blue-500">TV</span></h1>
-          <button onClick={() => setShowAdmin(true)} className="text-white text-sm px-4 py-2 rounded-full bg-black/20 backdrop-blur-sm">Admin</button>
+          <button onClick={() => navigateTo('admin')} className="text-white/90 hover:text-white text-sm px-4 py-2 rounded-full bg-black/20 backdrop-blur-sm">Admin</button>
         </nav>
 
-        {/* Center Content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
           <h1 className="text-4xl md:text-6xl font-black text-white mb-3 text-center italic">AmbroseOvienlonba<span className="text-blue-400">TV</span></h1>
           <p className="text-white/90 text-base md:text-lg mb-10">24/7 Christian Broadcasting Network</p>
           
-          {/* LIVE Button to enter main app */}
           <button 
-            onClick={() => setShowMainApp(true)} 
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-6 py-3 rounded text-sm font-bold transition-all text-white"
+            onClick={() => { setShowSplash(false); navigateTo('home'); }} 
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm font-bold transition-all text-white"
           >
             <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
             LIVE
           </button>
 
-          <p className="text-white/80 text-xs mt-4">Click to enter</p>
+          <p className="text-white/70 text-xs mt-4">Click to start streaming</p>
 
-          {/* Slide Indicators */}
-          {slides.length > 1 && (
-            <div className="absolute bottom-16 flex gap-3">
-              {slides.map((_, i) => (
-                <button key={i} onClick={() => setCurrentSlide(i)} className={`h-2 rounded-full transition-all ${i === currentSlide ? 'w-10 bg-blue-500' : 'w-2 bg-white/60'}`} />
-              ))}
-            </div>
-          )}
+          <div className="absolute bottom-16 flex gap-3">
+            {slides.map((_, i) => (
+              <button key={i} onClick={() => setCurrentSlide(i)} className={`h-2 rounded-full transition-all ${i === currentSlide ? 'w-10 bg-blue-500' : 'w-2 bg-white/50'}`} />
+            ))}
+          </div>
         </div>
 
-        {/* Admin Panel */}
         {showAdmin && (
           <AdminPanel 
             onClose={() => setShowAdmin(false)} 
@@ -154,24 +188,24 @@ export default function HomePage() {
             setSlides={setSlides}
             schedule={schedule}
             setSchedule={setSchedule}
-            tvSettings={tvSettings}
-            setTVSettings={setTVSettings}
+            settings={settings}
+            setSettings={setSettings}
           />
         )}
       </div>
     );
   }
 
-  // SECOND SCREEN - MAIN APP WITH VIDEOS (LIGHT THEME)
+  // MAIN APP - White background theme
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* Side Menu Overlay */}
       {showSideMenu && (
         <div className="fixed inset-0 z-[60] bg-black/30" onClick={() => setShowSideMenu(false)} />
       )}
       
       {/* Side Menu */}
-      <aside className={`fixed top-0 left-0 h-full w-72 bg-white z-[70] transform transition-transform duration-300 shadow-xl ${showSideMenu ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed top-0 left-0 h-full w-72 bg-white z-[70] transform transition-transform duration-300 shadow-2xl ${showSideMenu ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-xl font-black text-blue-600">AOTV</h2>
@@ -187,6 +221,7 @@ export default function HomePage() {
               { id: 'sermons', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253', label: 'Sermons' },
               { id: 'music', icon: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3', label: 'Music' },
               { id: 'movies', icon: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z', label: 'Movies' },
+              { id: 'schedule', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', label: 'Schedule' },
               { id: 'admin', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', label: 'Admin' },
             ].map(item => (
               <button
@@ -212,19 +247,16 @@ export default function HomePage() {
       </aside>
 
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm shadow-sm">
         <div className="flex items-center justify-between px-4 md:px-12 py-4">
           <div className="flex items-center gap-4 md:gap-6">
-            {/* Menu Button */}
             <button onClick={() => setShowSideMenu(true)} className="p-2 hover:bg-gray-100 rounded-full">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
-            {/* Back to Slider */}
-            <button onClick={() => setShowMainApp(false)} className="p-2 hover:bg-gray-100 rounded-full" title="Back to Home">
+            <button onClick={goBack} className="p-2 hover:bg-gray-100 rounded-full" title="Go Back">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            {/* Logo */}
-            <button onClick={() => { setActiveNav('home'); setActiveCategory('All'); }} className="text-lg md:text-xl font-black text-blue-600 hover:opacity-80">
+            <button onClick={() => navigateTo('splash')} className="text-lg md:text-xl font-black text-blue-600 hover:opacity-80">
               AOTV
             </button>
           </div>
@@ -232,7 +264,7 @@ export default function HomePage() {
             <button onClick={() => setShowSearch(!showSearch)} className="p-2 hover:bg-gray-100 rounded-full">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </button>
-            <button onClick={() => setShowAdmin(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-semibold text-white">Admin</button>
+            <button onClick={() => navigateTo('admin')} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-semibold text-white">Admin</button>
           </div>
         </div>
         {showSearch && (
@@ -264,35 +296,65 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Hero Section with Slider */}
-      {slides.length > 0 && (
-        <section className="relative h-[60vh] md:h-[70vh]">
-          <img src={slides[0]?.image_url} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/50 via-transparent to-transparent" />
-          <div className="absolute bottom-20 md:bottom-32 left-4 md:left-12 max-w-xl">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="flex items-center gap-1.5 bg-red-600 px-3 py-1 rounded text-xs font-bold text-white">
-                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />LIVE
-              </span>
-              <span className="text-white/80 text-xs">Featured</span>
+      {/* Hero Section */}
+      <section className="relative h-[70vh] md:h-[85vh]">
+        {slides[0] && (
+          <>
+            <img src={slides[0].image_url} alt={slides[0].title} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/60 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-900/40 via-transparent to-transparent" />
+            <div className="absolute bottom-32 md:bottom-40 left-4 md:left-12 max-w-xl">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex items-center gap-1.5 bg-red-600 px-2 py-0.5 rounded text-xs font-bold text-white">
+                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />LIVE
+                </span>
+                <span className="text-white/70 text-xs">Featured</span>
+              </div>
+              <h2 className="text-3xl md:text-5xl font-black text-white mb-3">{slides[0].title}</h2>
+              <p className="text-white/70 text-sm md:text-base mb-6">Experience powerful teachings and worship from AmbroseOvienlonbaTV.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowLiveScreen(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-bold text-sm text-white">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Watch Live
+                </button>
+                <button className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-6 py-3 rounded-lg font-bold text-sm text-white backdrop-blur-sm">More Info</button>
+              </div>
             </div>
-            <h2 className="text-2xl md:text-4xl font-black text-white mb-2">{slides[0]?.title}</h2>
-            <p className="text-white/80 text-sm md:text-base mb-4">Experience powerful teachings and worship from AmbroseOvienlonbaTV.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowLiveScreen(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-lg font-bold text-sm text-white">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Watch Live
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
+          </>
+        )}
+      </section>
 
-      {/* Video Content */}
-      <main className={`relative pb-24 z-10 ${slides.length > 0 ? '' : 'mt-28'}`}>
+      {/* Second Homepage Section - Featured Today */}
+      <section className="relative -mt-10 z-10 px-4 md:px-12 mb-8">
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 md:p-8 shadow-xl">
+          <h3 className="text-xl md:text-2xl font-bold mb-4 text-white">✨ Featured Today</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {videos.slice(0, 3).map((v, i) => (
+              <div 
+                key={v.id} 
+                onClick={() => playVideo(v)}
+                className="relative rounded-xl overflow-hidden cursor-pointer group aspect-video"
+              >
+                <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                <div className="absolute bottom-3 left-3 right-3">
+                  <p className="font-bold text-sm line-clamp-1 text-white">{v.title}</p>
+                  <p className="text-white/70 text-xs">{v.category} • {v.duration || '1:00:00'}</p>
+                </div>
+                {i === 0 && (
+                  <div className="absolute top-2 left-2 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold text-white">LIVE</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Content Rows */}
+      <main className="relative pb-24 z-10">
         {searchResults ? (
           <div className="px-4 md:px-12">
-            <h3 className="text-lg font-bold mb-4 text-gray-900">Search Results ({searchResults.length})</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <h3 className="text-lg md:text-xl font-bold mb-4">Search Results ({searchResults.length})</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {searchResults.map(v => (
                 <VideoCard key={v.id} video={v} onClick={() => playVideo(v)} />
               ))}
@@ -302,38 +364,23 @@ export default function HomePage() {
           <>
             {activeCategory !== 'All' && (
               <section className="px-4 md:px-12 mb-6">
-                <h3 className="text-lg font-bold mb-4 text-gray-900">{activeCategory} Videos</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <h3 className="text-lg md:text-xl font-bold mb-4">{activeCategory} Videos</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {filteredVideos.map(v => (
                     <VideoCard key={v.id} video={v} onClick={() => playVideo(v)} />
                   ))}
                 </div>
-                {filteredVideos.length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
-                    <p>No videos in this category yet.</p>
-                  </div>
-                )}
               </section>
             )}
             
             {activeCategory === 'All' && (
               <>
-                {liveVideos.length > 0 && <ContentRow title="Live Now" videos={liveVideos} onClick={playVideo} />}
-                {videos.length > 0 && <ContentRow title="Recently Added" videos={videos.slice(0, 8)} onClick={playVideo} />}
+                {liveVideos.length > 0 && <ContentRow title="🔴 Live Now" videos={liveVideos} onClick={playVideo} />}
+                <ContentRow title="Recently Added" videos={videos.slice(0, 6)} onClick={playVideo} />
                 {sermonsVideos.length > 0 && <ContentRow title="Sermons & Teachings" videos={sermonsVideos} onClick={playVideo} />}
                 {musicVideos.length > 0 && <ContentRow title="Gospel Music" videos={musicVideos} onClick={playVideo} />}
                 {moviesVideos.length > 0 && <ContentRow title="Faith Movies" videos={moviesVideos} onClick={playVideo} />}
-                
-                {videos.length === 0 && (
-                  <div className="text-center py-16">
-                    <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">No Videos Yet</h3>
-                    <p className="text-gray-500 mb-4">Add videos from the Admin panel</p>
-                    <button onClick={() => setShowAdmin(true)} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Go to Admin</button>
-                  </div>
-                )}
+                <ContentRow title="All Content" videos={videos} onClick={playVideo} />
               </>
             )}
           </>
@@ -351,8 +398,11 @@ export default function HomePage() {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             <span className="text-xs">Search</span>
           </button>
-          <button onClick={() => setShowLiveScreen(true)} className={`flex flex-col items-center gap-1 text-gray-500`}>
-            <span className="text-xs bg-red-600 text-white px-2 py-1 rounded font-bold">LIVE</span>
+          <button onClick={() => setShowLiveScreen(true)} className={`flex flex-col items-center gap-1 ${activeNav === 'live' ? 'text-blue-600' : 'text-gray-500'}`}>
+            <div className="w-6 h-6 flex items-center justify-center">
+              <span className="text-xs bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">LIVE</span>
+            </div>
+            <span className="text-xs">Live</span>
           </button>
           <button onClick={() => setShowAdmin(true)} className="flex flex-col items-center gap-1 text-gray-500">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -370,8 +420,8 @@ export default function HomePage() {
           setSlides={setSlides}
           schedule={schedule}
           setSchedule={setSchedule}
-          tvSettings={tvSettings}
-          setTVSettings={setTVSettings}
+          settings={settings}
+          setSettings={setSettings}
         />
       )}
     </div>
@@ -380,26 +430,18 @@ export default function HomePage() {
 
 // Live Screen Component
 function LiveScreen({ onBack, videos }: { onBack: () => void; videos: Video[] }) {
+  const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
   const liveVideo = videos[0];
 
-  const getYouTubeEmbedUrl = (url?: string) => {
-    if (!url) return null;
-    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1&modestbranding=1&rel=0` : null;
-  };
-
   return (
     <div className="fixed inset-0 bg-gray-900 z-[100]">
-      {/* Back Button */}
       <button onClick={onBack} className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 transition-colors text-white">
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         <span className="text-sm">Back</span>
       </button>
 
-      {/* Live Badge */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-        {/* Unmute Button */}
         {isMuted && (
           <button 
             onClick={() => setIsMuted(false)}
@@ -410,34 +452,35 @@ function LiveScreen({ onBack, videos }: { onBack: () => void; videos: Video[] })
           </button>
         )}
         <span className="flex items-center gap-1.5 bg-red-600 px-3 py-1.5 rounded text-sm font-bold text-white">
-          <span className="w-2 h-2 bg-white rounded-full animate-pulse" />LIVE
+          <span className="w-2 h-2 bg-white rounded-full animate-pulse" />LIVE NOW
         </span>
       </div>
 
-      {/* Video Player */}
       <div className="w-full h-full flex items-center justify-center">
-        {liveVideo?.youtube_url && getYouTubeEmbedUrl(liveVideo.youtube_url) ? (
+        {liveVideo?.youtube_url ? (
           <iframe 
-            src={getYouTubeEmbedUrl(liveVideo.youtube_url) || ''} 
+            src={`${liveVideo.youtube_url.replace('watch?v=', 'embed/')}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1`}
             className="w-full h-full" 
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
             allowFullScreen 
-          />
-        ) : liveVideo?.video_url ? (
-          <video 
-            src={liveVideo.video_url} 
-            className="w-full h-full object-contain"
-            autoPlay
-            controls
-            muted={isMuted}
           />
         ) : liveVideo?.thumbnail_url ? (
           <div className="relative w-full h-full">
             <img src={liveVideo.thumbnail_url} alt={liveVideo.title} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/30" />
+            <button 
+              onClick={() => setIsPlaying(!isPlaying)} 
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              {!isPlaying && (
+                <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </div>
+              )}
+            </button>
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
               <h2 className="text-2xl font-bold text-white mb-2">{liveVideo.title}</h2>
-              <p className="text-white/70">{liveVideo.description || 'Live broadcast'}</p>
+              <p className="text-white/70">{liveVideo.description || 'Live broadcast from AmbroseOvienlonbaTV'}</p>
             </div>
           </div>
         ) : (
@@ -447,7 +490,6 @@ function LiveScreen({ onBack, videos }: { onBack: () => void; videos: Video[] })
             </div>
             <h2 className="text-xl font-bold mb-2">No Live Stream Available</h2>
             <p className="text-white/60">Check back later for our next live broadcast</p>
-            <button onClick={onBack} className="mt-4 px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700">Back to Home</button>
           </div>
         )}
       </div>
@@ -457,50 +499,37 @@ function LiveScreen({ onBack, videos }: { onBack: () => void; videos: Video[] })
 
 // Video Player Screen Component
 function VideoPlayerScreen({ video, onBack, autoplay }: { video: Video; onBack: () => void; autoplay: boolean }) {
-  const getYouTubeEmbedUrl = (url?: string) => {
-    if (!url) return null;
-    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=${autoplay ? 1 : 0}&mute=0&controls=1&modestbranding=1&rel=0` : null;
-  };
-
   return (
     <div className="fixed inset-0 bg-gray-900 z-[100]">
-      {/* Back Button */}
       <button onClick={onBack} className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 text-white">
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         <span className="text-sm">Back</span>
       </button>
 
-      {/* Video */}
       <div className="w-full h-full flex items-center justify-center">
-        {video.youtube_url && getYouTubeEmbedUrl(video.youtube_url) ? (
-          <iframe
-            src={getYouTubeEmbedUrl(video.youtube_url) || ''}
-            className="w-full h-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        ) : video.video_url ? (
-          <video 
-            src={video.video_url} 
-            className="w-full h-full object-contain"
-            autoPlay={autoplay}
-            controls
-          />
-        ) : (
-          <div className="relative w-full h-full max-w-5xl mx-auto">
-            <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-contain" />
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
-              <h2 className="text-xl md:text-2xl font-bold text-white mb-2">{video.title}</h2>
-              <p className="text-white/70 text-sm mb-2">{video.description}</p>
-              <div className="flex items-center gap-4 text-white/60 text-sm">
-                <span>{video.category}</span>
-                <span>•</span>
-                <span>{video.duration || '1:00:00'}</span>
+        <div className="relative w-full h-full max-w-5xl mx-auto">
+          {video.youtube_url ? (
+            <iframe
+              src={`${video.youtube_url.replace('watch?v=', 'embed/')}?autoplay=${autoplay ? 1 : 0}`}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <div className="relative w-full h-full">
+              <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-contain" />
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+                <h2 className="text-xl md:text-2xl font-bold text-white mb-2">{video.title}</h2>
+                <p className="text-white/70 text-sm mb-2">{video.description}</p>
+                <div className="flex items-center gap-4 text-white/60 text-sm">
+                  <span>{video.category}</span>
+                  <span>•</span>
+                  <span>{video.duration || '1:00:00'}</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -519,11 +548,11 @@ function ContentRow({ title, videos, onClick }: { title: string; videos: Video[]
 
   return (
     <section className="relative mb-6 md:mb-8">
-      <h3 className="text-lg md:text-xl font-bold mb-2 md:mb-3 px-4 md:px-12 text-gray-900">{title}</h3>
+      <h3 className="text-lg md:text-xl font-bold mb-2 md:mb-3 px-4 md:px-12">{title}</h3>
       {left && (
-        <button onClick={() => scroll('left')} className="absolute left-0 top-12 z-10 w-10 h-28 bg-gradient-to-r from-gray-50 to-transparent flex items-center pl-2">
+        <button onClick={() => scroll('left')} className="absolute left-0 top-12 z-10 w-10 h-32 bg-gradient-to-r from-white to-transparent flex items-center pl-2">
           <div className="w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-gray-50">
-            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </div>
         </button>
       )}
@@ -531,9 +560,9 @@ function ContentRow({ title, videos, onClick }: { title: string; videos: Video[]
         {videos.map(v => <VideoCard key={v.id} video={v} onClick={() => onClick(v)} />)}
       </div>
       {right && (
-        <button onClick={() => scroll('right')} className="absolute right-0 top-12 z-10 w-10 h-28 bg-gradient-to-l from-gray-50 to-transparent flex items-center justify-end pr-2">
+        <button onClick={() => scroll('right')} className="absolute right-0 top-12 z-10 w-10 h-32 bg-gradient-to-l from-white to-transparent flex items-center justify-end pr-2">
           <div className="w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-gray-50">
-            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
           </div>
         </button>
       )}
@@ -543,37 +572,38 @@ function ContentRow({ title, videos, onClick }: { title: string; videos: Video[]
 
 // Video Card Component
 function VideoCard({ video, onClick }: { video: Video; onClick: () => void }) {
+  const [hover, setHover] = useState(false);
   return (
     <div 
-      className="flex-shrink-0 w-32 md:w-44 cursor-pointer group" 
+      className="flex-shrink-0 w-32 md:w-44 cursor-pointer group relative" 
+      onMouseEnter={() => setHover(true)} 
+      onMouseLeave={() => setHover(false)} 
       onClick={onClick}
     >
-      <div className="relative rounded-lg overflow-hidden aspect-video bg-gray-200 shadow-sm">
-        {video.thumbnail_url ? (
-          <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-300">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+      <div className="relative rounded-md overflow-hidden aspect-video bg-gray-200 shadow-sm">
+        <img src={video.thumbnail_url || 'https://via.placeholder.com/320x180'} alt={video.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
+        <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${hover ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
           </div>
-        )}
+        </div>
         {video.featured && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold text-white">
+          <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-red-600 px-1.5 py-0.5 rounded text-[10px] font-bold text-white">
             <span className="w-1 h-1 bg-white rounded-full animate-pulse" />LIVE
           </div>
         )}
         {video.duration && (
-          <div className="absolute bottom-2 right-2 bg-black/70 px-1.5 py-0.5 rounded text-[10px] text-white">
+          <div className="absolute bottom-1.5 right-1.5 bg-black/70 px-1.5 py-0.5 rounded text-[10px] text-white">
             {video.duration}
           </div>
         )}
       </div>
-      <p className="text-xs text-gray-700 mt-2 line-clamp-2 font-medium">{video.title}</p>
-      <p className="text-xs text-gray-500">{video.category}</p>
+      <p className="text-xs text-gray-700 mt-1.5 line-clamp-1 font-medium">{video.title}</p>
     </div>
   );
 }
 
-// Admin Panel Component
+// Admin Panel Component with all features
 function AdminPanel({ 
   onClose, 
   videos, 
@@ -582,8 +612,8 @@ function AdminPanel({
   setSlides,
   schedule,
   setSchedule,
-  tvSettings,
-  setTVSettings
+  settings,
+  setSettings
 }: { 
   onClose: () => void; 
   videos: Video[]; 
@@ -592,18 +622,16 @@ function AdminPanel({
   setSlides: (s: Slide[]) => void;
   schedule: Schedule[];
   setSchedule: (s: Schedule[]) => void;
-  tvSettings: TVSettings;
-  setTVSettings: (s: TVSettings) => void;
+  settings: Settings;
+  setSettings: (s: Settings) => void;
 }) {
   const [tab, setTab] = useState('videos');
-  const [form, setForm] = useState({ title: '', category: 'Sermons', youtube_url: '', video_url: '', thumbnail_url: '', description: '', duration: '', featured: false });
+  const [form, setForm] = useState({ title: '', category: 'Sermons', youtube_url: '', thumbnail_url: '', description: '', duration: '', featured: false });
   const [slideForm, setSlideForm] = useState({ title: '', image_url: '' });
   const [scheduleForm, setScheduleForm] = useState({ title: '', day: 'Monday', time: '09:00', description: '' });
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
-  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Extract YouTube thumbnail
   const getYouTubeThumbnail = (url: string): string | null => {
     if (!url) return null;
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
@@ -615,65 +643,14 @@ function AdminPanel({
     setForm(prev => ({ ...prev, youtube_url: url, thumbnail_url: thumbnail || prev.thumbnail_url }));
   };
 
-  // Handle video file upload
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', 'video');
-
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (data.url) {
-        setForm(prev => ({ ...prev, video_url: data.url }));
-        alert('Video uploaded successfully!');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('Failed to upload video. Please try again.');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Handle thumbnail upload
-  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', 'image');
-
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (data.url) {
-        setForm(prev => ({ ...prev, thumbnail_url: data.url }));
-        alert('Thumbnail uploaded successfully!');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('Failed to upload thumbnail. Please try again.');
-    } finally {
-      setUploading(false);
-    }
+    alert('Video selected: ' + file.name + '. Upload to YouTube and paste the URL for best results, or use the video URL field.');
   };
 
   const addVideo = async () => {
     if (!form.title) return alert('Enter title');
-    
     const res = await fetch('/api/videos', { 
       method: 'POST', 
       headers: { 'Content-Type': 'application/json' }, 
@@ -682,8 +659,8 @@ function AdminPanel({
     if (res.ok) { 
       const d = await res.json(); 
       setVideos([d.video, ...videos]); 
-      setForm({ title: '', category: 'Sermons', youtube_url: '', video_url: '', thumbnail_url: '', description: '', duration: '', featured: false }); 
-      alert('Video added successfully! It will appear on all devices.'); 
+      setForm({ title: '', category: 'Sermons', youtube_url: '', thumbnail_url: '', description: '', duration: '', featured: false }); 
+      alert('Video added! Visible on ALL devices.'); 
     }
   };
 
@@ -728,7 +705,7 @@ function AdminPanel({
     setSlides(slides.filter(s => s.id !== id));
   };
 
-  const addScheduleItem = () => {
+  const addSchedule = () => {
     if (!scheduleForm.title) return alert('Enter title');
     const newSchedule = { ...scheduleForm, id: Date.now().toString() };
     setSchedule([...schedule, newSchedule]);
@@ -742,39 +719,36 @@ function AdminPanel({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-gray-50 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] bg-white overflow-y-auto">
       <div className="max-w-4xl mx-auto p-6 md:p-10">
-        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
-            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full">
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <h2 className="text-2xl font-black text-blue-600">AOTV Admin</h2>
+            <h2 className="text-2xl font-black text-blue-600">AOTV Creator Studio</h2>
           </div>
-          <button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-full text-sm hover:bg-gray-300">Close</button>
+          <button onClick={onClose} className="bg-gray-100 px-4 py-2 rounded-full text-sm hover:bg-gray-200">Close</button>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
           {[
             { id: 'videos', label: 'Videos' },
             { id: 'add', label: 'Add Video' },
             { id: 'slides', label: 'Image Slider' },
             { id: 'schedule', label: 'Schedule' },
-            { id: 'tvsettings', label: 'TV Settings' },
+            { id: 'settings', label: 'Settings' },
           ].map(t => (
             <button 
               key={t.id} 
               onClick={() => setTab(t.id)} 
-              className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap ${tab === t.id ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap ${tab === t.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* Videos Tab */}
         {tab === 'videos' && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {videos.map(v => (
@@ -793,29 +767,23 @@ function AdminPanel({
                 </div>
               </div>
             ))}
-            {videos.length === 0 && (
-              <div className="col-span-full text-center py-12 text-gray-500">
-                <p>No videos yet. Add your first video!</p>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Add Video Tab */}
         {tab === 'add' && (
           <div className="max-w-lg">
-            <h3 className="text-lg font-bold mb-4 text-gray-900">Add New Video</h3>
-            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm space-y-4">
+            <h3 className="text-lg font-bold mb-4">Add New Video</h3>
+            <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 space-y-4">
               <input 
                 placeholder="Video Title *" 
                 value={form.title} 
                 onChange={e => setForm({...form, title: e.target.value})} 
-                className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+                className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
               />
               <select 
                 value={form.category} 
                 onChange={e => setForm({...form, category: e.target.value})} 
-                className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900"
+                className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900"
               >
                 <option value="Sermons">Sermons</option>
                 <option value="Music">Music</option>
@@ -824,62 +792,32 @@ function AdminPanel({
                 <option value="Shows">Shows</option>
                 <option value="Kids">Kids</option>
               </select>
-
-              {/* YouTube URL Option */}
-              <div className="border-t border-gray-200 pt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Option 1: YouTube URL</p>
-                <input 
-                  placeholder="YouTube URL (thumbnail auto-detected)" 
-                  value={form.youtube_url} 
-                  onChange={e => handleYouTubeUrlChange(e.target.value)} 
-                  className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
-                />
-              </div>
-
-              {/* Video Upload Option */}
-              <div className="border-t border-gray-200 pt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Option 2: Upload Video from Device</p>
-                <input 
-                  ref={fileInputRef}
-                  type="file" 
-                  accept="video/*"
-                  onChange={handleVideoUpload}
-                  className="hidden"
-                />
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="w-full p-3 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors text-sm font-medium"
-                >
-                  {uploading ? 'Uploading...' : '📁 Upload Video from Device'}
-                </button>
-                {form.video_url && (
-                  <p className="text-xs text-green-600 mt-2">✓ Video uploaded: {form.video_url.slice(0, 50)}...</p>
-                )}
-              </div>
-
-              {/* Thumbnail */}
+              <input 
+                placeholder="YouTube URL (thumbnail auto-detected)" 
+                value={form.youtube_url} 
+                onChange={e => handleYouTubeUrlChange(e.target.value)} 
+                className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+              />
               {form.thumbnail_url && (
                 <img src={form.thumbnail_url} alt="Thumbnail" className="w-48 h-28 object-cover rounded-lg border border-gray-200" />
               )}
-              
               <input 
-                placeholder="Or enter Thumbnail URL manually" 
+                placeholder="Thumbnail URL" 
                 value={form.thumbnail_url} 
                 onChange={e => setForm({...form, thumbnail_url: e.target.value})} 
-                className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+                className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
               />
               <input 
                 placeholder="Duration (e.g., 1:30:00)" 
                 value={form.duration} 
                 onChange={e => setForm({...form, duration: e.target.value})} 
-                className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+                className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
               />
               <textarea 
                 placeholder="Description" 
                 value={form.description} 
                 onChange={e => setForm({...form, description: e.target.value})} 
-                className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 h-24 resize-none focus:border-blue-500 focus:outline-none" 
+                className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-500 h-24 resize-none focus:border-blue-500 focus:outline-none" 
               />
               <label className="flex items-center gap-3 cursor-pointer">
                 <input 
@@ -890,30 +828,49 @@ function AdminPanel({
                 />
                 <span className="text-sm text-gray-700">Featured / Live Video</span>
               </label>
+              
+              {/* Upload Video to Device */}
+              <div className="border-t border-gray-200 pt-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">Upload Video from Device</p>
+                <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  accept="video/*"
+                  onChange={handleVideoUpload}
+                  className="hidden"
+                />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full p-3 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors text-sm font-medium"
+                >
+                  📁 Upload Video from Device
+                </button>
+                <p className="text-xs text-gray-500 mt-2">Tip: Upload to YouTube for best streaming quality</p>
+              </div>
+              
               <button onClick={addVideo} className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors text-white">
-                Add Video (Saves to all devices)
+                Add Video (Visible on ALL devices)
               </button>
             </div>
           </div>
         )}
 
-        {/* Image Slider Tab */}
         {tab === 'slides' && (
           <div className="space-y-8">
             <div className="max-w-lg">
-              <h3 className="text-lg font-bold mb-4 text-gray-900">Add Slider Image</h3>
-              <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm space-y-4">
+              <h3 className="text-lg font-bold mb-4">Add Slider Image</h3>
+              <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 space-y-4">
                 <input 
                   placeholder="Slide Title *" 
                   value={slideForm.title} 
                   onChange={e => setSlideForm({...slideForm, title: e.target.value})} 
-                  className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+                  className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
                 />
                 <input 
                   placeholder="Image URL *" 
                   value={slideForm.image_url} 
                   onChange={e => setSlideForm({...slideForm, image_url: e.target.value})} 
-                  className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+                  className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
                 />
                 <button onClick={addSlide} className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors text-white">
                   Add Slide
@@ -922,7 +879,7 @@ function AdminPanel({
             </div>
             
             <div>
-              <h3 className="text-lg font-bold mb-4 text-gray-900">Current Slides ({slides.length})</h3>
+              <h3 className="text-lg font-bold mb-4">Current Slides ({slides.length})</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {slides.map((s, i) => (
                   <div key={s.id} className="bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm">
@@ -941,22 +898,21 @@ function AdminPanel({
           </div>
         )}
 
-        {/* Schedule Tab */}
         {tab === 'schedule' && (
           <div className="space-y-8">
             <div className="max-w-lg">
-              <h3 className="text-lg font-bold mb-4 text-gray-900">Add Programme Schedule</h3>
-              <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm space-y-4">
+              <h3 className="text-lg font-bold mb-4">Add Programme Schedule</h3>
+              <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 space-y-4">
                 <input 
                   placeholder="Programme Title *" 
                   value={scheduleForm.title} 
                   onChange={e => setScheduleForm({...scheduleForm, title: e.target.value})} 
-                  className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+                  className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
                 />
                 <select 
                   value={scheduleForm.day} 
                   onChange={e => setScheduleForm({...scheduleForm, day: e.target.value})} 
-                  className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900"
+                  className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900"
                 >
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (
                     <option key={d} value={d}>{d}</option>
@@ -966,22 +922,22 @@ function AdminPanel({
                   type="time" 
                   value={scheduleForm.time} 
                   onChange={e => setScheduleForm({...scheduleForm, time: e.target.value})} 
-                  className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none" 
+                  className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none" 
                 />
                 <input 
                   placeholder="Description" 
                   value={scheduleForm.description} 
                   onChange={e => setScheduleForm({...scheduleForm, description: e.target.value})} 
-                  className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+                  className="w-full p-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
                 />
-                <button onClick={addScheduleItem} className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors text-white">
+                <button onClick={addSchedule} className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors text-white">
                   Add Schedule
                 </button>
               </div>
             </div>
 
             <div>
-              <h3 className="text-lg font-bold mb-4 text-gray-900">Weekly Schedule</h3>
+              <h3 className="text-lg font-bold mb-4">Weekly Schedule</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
                   const daySchedule = schedule.filter(s => s.day === day);
@@ -1011,71 +967,38 @@ function AdminPanel({
           </div>
         )}
 
-        {/* TV Settings Tab */}
-        {tab === 'tvsettings' && (
+        {tab === 'settings' && (
           <div className="max-w-lg space-y-6">
-            <h3 className="text-lg font-bold text-gray-900">TV Mode Settings</h3>
-            
-            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm space-y-4">
-              {/* Autoplay Toggle */}
+            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+              <h2 className="text-lg font-bold mb-4">Playback Settings</h2>
               <div className="flex items-center justify-between py-4 border-b border-gray-200">
                 <div>
-                  <p className="font-medium text-gray-900">Autoplay Videos</p>
+                  <p className="font-medium">Autoplay Videos</p>
                   <p className="text-sm text-gray-500">Automatically play videos when selected</p>
                 </div>
                 <button 
-                  onClick={() => setTVSettings({ ...tvSettings, autoplay: !tvSettings.autoplay })}
-                  className={`w-14 h-8 rounded-full transition-colors ${tvSettings.autoplay ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  onClick={() => setSettings({ ...settings, autoplay: !settings.autoplay })}
+                  className={`w-14 h-8 rounded-full transition-colors ${settings.autoplay ? 'bg-blue-600' : 'bg-gray-300'}`}
                 >
-                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${tvSettings.autoplay ? 'translate-x-7' : 'translate-x-1'}`} />
+                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${settings.autoplay ? 'translate-x-7' : 'translate-x-1'}`} />
                 </button>
               </div>
-
-              {/* Single Mode Toggle */}
-              <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                <div>
-                  <p className="font-medium text-gray-900">Single Mode Programme</p>
-                  <p className="text-sm text-gray-500">Play one programme at a time</p>
-                </div>
-                <button 
-                  onClick={() => setTVSettings({ ...tvSettings, singleMode: !tvSettings.singleMode })}
-                  className={`w-14 h-8 rounded-full transition-colors ${tvSettings.singleMode ? 'bg-blue-600' : 'bg-gray-300'}`}
-                >
-                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${tvSettings.singleMode ? 'translate-x-7' : 'translate-x-1'}`} />
-                </button>
-              </div>
-
-              {/* Loop Playback Toggle */}
-              <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                <div>
-                  <p className="font-medium text-gray-900">Loop Playback</p>
-                  <p className="text-sm text-gray-500">Restart playlist after all videos play</p>
-                </div>
-                <button 
-                  onClick={() => setTVSettings({ ...tvSettings, loopPlayback: !tvSettings.loopPlayback })}
-                  className={`w-14 h-8 rounded-full transition-colors ${tvSettings.loopPlayback ? 'bg-blue-600' : 'bg-gray-300'}`}
-                >
-                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${tvSettings.loopPlayback ? 'translate-x-7' : 'translate-x-1'}`} />
-                </button>
-              </div>
-
-              {/* Show Schedule Toggle */}
               <div className="flex items-center justify-between py-4">
                 <div>
-                  <p className="font-medium text-gray-900">Show Schedule on Home</p>
-                  <p className="text-sm text-gray-500">Display the schedule section</p>
+                  <p className="font-medium">Dark Mode</p>
+                  <p className="text-sm text-gray-500">Use dark theme</p>
                 </div>
                 <button 
-                  onClick={() => setTVSettings({ ...tvSettings, showSchedule: !tvSettings.showSchedule })}
-                  className={`w-14 h-8 rounded-full transition-colors ${tvSettings.showSchedule ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  onClick={() => setSettings({ ...settings, darkMode: !settings.darkMode })}
+                  className={`w-14 h-8 rounded-full transition-colors ${settings.darkMode ? 'bg-blue-600' : 'bg-gray-300'}`}
                 >
-                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${tvSettings.showSchedule ? 'translate-x-7' : 'translate-x-1'}`} />
+                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${settings.darkMode ? 'translate-x-7' : 'translate-x-1'}`} />
                 </button>
               </div>
             </div>
 
             <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-              <h4 className="font-bold text-gray-900 mb-4">App Information</h4>
+              <h2 className="text-lg font-bold mb-4">App Information</h2>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Version</span>
@@ -1094,7 +1017,6 @@ function AdminPanel({
           </div>
         )}
 
-        {/* Edit Video Modal */}
         {editingVideo && (
           <div className="fixed inset-0 z-[110] bg-black/50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl p-6 w-full max-w-md border border-gray-200 max-h-[90vh] overflow-y-auto">
@@ -1127,12 +1049,6 @@ function AdminPanel({
                   placeholder="YouTube URL" 
                   value={editingVideo.youtube_url || ''} 
                   onChange={e => setEditingVideo({...editingVideo, youtube_url: e.target.value})} 
-                  className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none" 
-                />
-                <input 
-                  placeholder="Video URL (uploaded)" 
-                  value={editingVideo.video_url || ''} 
-                  onChange={e => setEditingVideo({...editingVideo, video_url: e.target.value})} 
                   className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none" 
                 />
                 <input 
